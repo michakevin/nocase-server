@@ -18,6 +18,7 @@ filename casing.
 | 📦 **Tiny dependency tree** | Only depends on the `mime` package (for proper `Content‑Type` headers). |
 | 🛠️ **Node ≥ 18** | Uses native ES modules – no transpiler required. |
 | ⚡ **Performance optimized** | LRU cache for directory resolution and proper stream handling. |
+| 🎬 **HTTP Range support** | Supports byte-range requests for media streaming (ideal for Electron/NW.js apps). |
 
 ---
 
@@ -27,6 +28,18 @@ filename casing.
 
 ```bash
 npm install -g nocase-server
+```
+
+### As a dependency
+
+```bash
+npm install nocase-server
+```
+
+```javascript
+import { createHandler } from 'nocase-server';
+
+const handler = createHandler('/path/to/webroot', { spa: true });
 ```
 
 ### Local development
@@ -46,17 +59,25 @@ npm link        # makes the 'nocase-server' command globally available
 # serve the current directory on port 8080
 nocase-server
 
-# serve the 'www' folder on port 3000
-nocase-server www -p 3000
+# serve the 'www' folder on port 8080 (consistent port example)
+nocase-server www -p 8080
 
 # serve without SPA fallback (returns real 404s)
 nocase-server --no-spa
+
+# customize cache size (0 disables cache)
+nocase-server --cache 5000
+
+# use plain text 404 errors instead of HTML
+nocase-server --plain-404
 
 # check version
 nocase-server --version
 ```
 
-Open <http://localhost:8080> (or the port you chose) in your browser.
+Open <http://localhost:8080> in your browser.
+
+**Note:** Case-insensitive matching only works for ASCII characters. Unicode characters like umlauts (ä, ö, ü) are not normalized and must match exactly.
 
 ---
 
@@ -67,6 +88,8 @@ Open <http://localhost:8080> (or the port you chose) in your browser.
 | `<folder>` | `.` | Root directory to serve. |
 | `-p <port>` | `8080` | Port to listen on. Can also be set via the `PORT` environment variable. |
 | `--no-spa` | — | Disable SPA fallback. Returns 404 for missing files instead of serving `index.html`. |
+| `--cache <n>` | `2000` | Set LRU cache size for directory lookups. Use `0` to disable caching. |
+| `--plain-404` | — | Return plain text 404 errors instead of HTML. |
 | `-v, --version` | — | Show version number. |
 | `-h, --help` | — | Show a short help message. |
 
@@ -78,14 +101,17 @@ Open <http://localhost:8080> (or the port you chose) in your browser.
 - **Symlink escape prevention**: Blocks symlinks that point outside the document root
 - **HTTP method whitelist**: Only accepts GET and HEAD requests
 - **Proper error handling**: Clean exit codes and error messages
+- **Additional symlink safety**: Double-checks resolved file paths to prevent escapes
 
 ---
 
 ## ⚡ Performance Features
 
-- **LRU cache**: Speeds up repeated directory lookups
-- **Stream-based file serving**: No memory buffering of large files
+- **LRU cache**: Speeds up repeated directory lookups (configurable size)
+- **Stream-based file serving**: No memory buffering of large files  
 - **Optimized directory traversal**: Uses `fs.opendir()` with `withFileTypes`
+- **HEAD request optimization**: No file streams opened for HEAD requests
+- **HTTP Range support**: Efficient partial content delivery for media files
 
 ---
 
@@ -117,11 +143,16 @@ npm test
 ```
 
 Includes comprehensive tests for:
+
 - Case-insensitive file resolution
-- SPA fallback behavior
+- SPA fallback behavior  
 - Security (symlink traversal prevention)
 - HTTP method validation
 - CLI functionality
+- HEAD request handling
+- HTTP Range request support
+- Cache functionality
+- Error handling (HTML vs plain text 404s)
 
 ---
 

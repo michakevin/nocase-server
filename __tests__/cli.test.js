@@ -95,5 +95,38 @@ describe("CLI tests", () => {
     expect(output.code).toBe(0);
     expect(output.stdout).toContain("Usage:");
     expect(output.stdout).toContain("--no-spa");
+    expect(output.stdout).toContain("--cache");
+    expect(output.stdout).toContain("--plain-404");
+  });
+
+  test("shows help with -h flag", async () => {
+    const child = spawn("node", [cliPath, "-h"], {
+      stdio: "pipe",
+    });
+
+    const output = await new Promise((resolve, reject) => {
+      let stdout = "";
+      let stderr = "";
+
+      child.stdout.on("data", (data) => {
+        stdout += data.toString();
+      });
+
+      child.stderr.on("data", (data) => {
+        stderr += data.toString();
+      });
+
+      child.on("close", (code) => {
+        if (code === 0) {
+          resolve({ stdout, stderr, code });
+        } else {
+          reject(new Error(`Process exited with code ${code}: ${stderr}`));
+        }
+      });
+    });
+
+    expect(output.code).toBe(0);
+    expect(output.stdout).toContain("Usage:");
+    expect(output.stdout).toContain("cache 2000");
   });
 });

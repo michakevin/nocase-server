@@ -9,12 +9,69 @@ import mime from "mime";
 
 // Simple LRU cache for directory resolution
 const cache = new Map();
-const MAX_CACHE_SIZE = 2000;
+let MAX_CACHE_SIZE = 2000;
 
 /** Prüft, ob `target` sich noch innerhalb von `base` befindet. */
 function isInside(base, target) {
   const rel = relative(base, target);
   return rel !== undefined && !rel.startsWith(".." + sep);
+}
+
+/**
+ * Checks if a file path is safe after symlink resolution.
+ * @param {string} base - The base directory
+ * @param {string} filePath - The file path to check
+ * @returns {Promise<string|null>} - The real path if safe, null otherwise
+ */
+export async function checkSymlinkSafety(base, filePath) {
+  try {
+    const realPath = await fs.realpath(filePath);
+    const realBase = await fs.realpath(base);
+    return isInside(realBase, realPath) ? realPath : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Parse simple Range header for byte ranges.
+ * @param {string} rangeHeader - The Range header value
+ * @param {number} fileSize - The file size
+ * @returns {object|null} - Range info or null if invalid
+ */
+function parseRange(rangeHeader, fileSize) {
+  if (!rangeHeader || !rangeHeader.startsWith("bytes=")) return null;
+
+  const range = rangeHeader.substring(6);
+  const [startStr, endStr] = range.split("-");
+
+  let start = parseInt(startStr, 10);
+  let end = parseInt(endStr, 10);
+
+  if (isNaN(start) && isNaN(end)) return null;
+
+  if (isNaN(start)) start = fileSize - end;
+  if (isNaN(end)) end = fileSize - 1;
+
+  if (start < 0 || end >= fileSize || start > end) return null;
+
+  return { start, end, length: end - start + 1 };
+}
+
+/**
+ * Set the cache size for directory resolution.
+ * @param {number} size - Cache size (0 to disable)
+ */
+export function setCacheSize(size) {
+  MAX_CACHE_SIZE = size;
+  if (size === 0) {
+    cache.clear();
+  } else if (cache.size > size) {
+    // Trim cache to new size
+    const entries = Array.from(cache.entries());
+    cache.clear();
+    entries.slice(-size).forEach(([k, v]) => cache.set(k, v));
+  }
 }
 
 /**
@@ -32,23 +89,25 @@ export async function resolveNocaseSafe(root, segs) {
   for (const seg of segs) {
     const key = `${cur}|${seg.toLowerCase()}`;
 
-    if (cache.has(key)) {
+    if (MAX_CACHE_SIZE > 0 && cache.has(key)) {
       cur = cache.get(key);
       continue;
     }
 
     let found = false;
     for await (const dirent of await fs.opendir(cur)) {
-      if (dirent.isSymbolicLink()) continue;
+      // Note: We allow symlinks here but check safety later with checkSymlinkSafety
       if (dirent.name.toLowerCase() === seg.toLowerCase()) {
         cur = join(cur, dirent.name);
 
         // Add to cache with LRU eviction
-        if (cache.size >= MAX_CACHE_SIZE) {
-          const firstKey = cache.keys().next().value;
-          cache.delete(firstKey);
+        if (MAX_CACHE_SIZE > 0) {
+          if (cache.size >= MAX_CACHE_SIZE) {
+            const firstKey = cache.keys().next().value;
+            cache.delete(firstKey);
+          }
+          cache.set(key, cur);
         }
-        cache.set(key, cur);
 
         found = true;
         break;
@@ -66,7 +125,7 @@ export async function resolveNocaseSafe(root, segs) {
 }
 
 /* ─────────────────── factory ─────────────────── */
-export function createHandler(root, { spa = true } = {}) {
+export function createHandler(root, { spa = true, plainError = false } = {}) {
   return async (req, res) => {
     // HTTP method whitelist
     if (!["GET", "HEAD"].includes(req.method)) {
@@ -86,6 +145,12 @@ export function createHandler(root, { spa = true } = {}) {
       }
       if (!file) throw Object.assign(new Error("ENOENT"), { code: "ENOENT" });
 
+      // Additional symlink safety check on final file
+      const safePath = await checkSymlinkSafety(root, file);
+      if (!safePath)
+        throw Object.assign(new Error("ENOENT"), { code: "ENOENT" });
+      file = safePath;
+
       let stat = await fs.stat(file);
       if (stat.isDirectory()) {
         // For directories, try to find index.html case-insensitively
@@ -99,16 +164,80 @@ export function createHandler(root, { spa = true } = {}) {
       }
 
       const type = mime.getType(file) || "application/octet-stream";
-      res.writeHead(200, { "Content-Type": type, "Content-Length": stat.size });
 
-      const stream = createReadStream(file);
-      stream.on("error", (e) => {
-        if (e.code !== "ECONNRESET") console.error(e);
-      });
-      stream.pipe(res);
+      // Handle Range requests
+      const rangeHeader = req.headers.range;
+      const range = parseRange(rangeHeader, stat.size);
+
+      if (range) {
+        // Partial content response
+        res.writeHead(206, {
+          "Content-Type": type,
+          "Content-Length": range.length,
+          "Content-Range": `bytes ${range.start}-${range.end}/${stat.size}`,
+          "Accept-Ranges": "bytes",
+        });
+
+        // Handle HEAD requests for ranges
+        if (req.method === "HEAD") {
+          res.end();
+          return;
+        }
+
+        const stream = createReadStream(file, {
+          start: range.start,
+          end: range.end,
+        });
+        stream.on("error", (e) => {
+          if (e.code !== "ECONNRESET") console.error(e);
+        });
+        stream.pipe(res);
+      } else if (rangeHeader) {
+        // Invalid range
+        res
+          .writeHead(416, {
+            "Content-Range": `bytes */${stat.size}`,
+          })
+          .end();
+      } else {
+        // Normal response
+        res.writeHead(200, {
+          "Content-Type": type,
+          "Content-Length": stat.size,
+          "Accept-Ranges": "bytes",
+        });
+
+        // Handle HEAD requests without opening stream
+        if (req.method === "HEAD") {
+          res.end();
+          return;
+        }
+
+        const stream = createReadStream(file);
+        stream.on("error", (e) => {
+          if (e.code !== "ECONNRESET") console.error(e);
+        });
+        stream.pipe(res);
+      }
     } catch (err) {
       if (err.code === "ENOENT") {
-        res.writeHead(404).end("Not found");
+        if (plainError) {
+          res
+            .writeHead(404, { "Content-Type": "text/plain; charset=utf-8" })
+            .end("Not found");
+        } else {
+          const html = `<!DOCTYPE html>
+<html>
+<head><title>404 - File not found</title></head>
+<body>
+<h1>404 - File not found</h1>
+<p>The requested file could not be found.</p>
+</body>
+</html>`;
+          res
+            .writeHead(404, { "Content-Type": "text/html; charset=utf-8" })
+            .end(html);
+        }
       } else {
         console.error(err);
         res.writeHead(500).end("Internal error");

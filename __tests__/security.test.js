@@ -1,7 +1,7 @@
 import { promises as fs } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
-import { resolveNocaseSafe } from "../src/server.js";
+import { resolveNocaseSafe, checkSymlinkSafety } from "../src/server.js";
 import { tmpdir } from "node:os";
 
 const __dir = dirname(fileURLToPath(import.meta.url));
@@ -37,11 +37,19 @@ describe("Security tests", () => {
       // Try to access the symlinked secret file
       const result = await resolveNocaseSafe(publicDir, ["escape"]);
 
-      // Should return null (not found) due to symlink filtering
-      expect(result).toBeNull();
+      // resolveNocaseSafe should find the symlink, but checkSymlinkSafety should reject it
+      expect(result).not.toBeNull();
+
+      // The safety check should prevent the escape
+      const safePath = await checkSymlinkSafety(publicDir, result);
+      expect(safePath).toBeNull();
     } catch (e) {
       // Some systems might not support symlinks, skip test
-      console.warn("Symlink test skipped:", e.message);
+      if (e.code === "EPERM" || e.code === "ENOTSUP") {
+        console.log("Skipping symlink test - not supported on this system");
+        return;
+      }
+      throw e;
     }
   });
 
