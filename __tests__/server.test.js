@@ -36,4 +36,24 @@ describe("nocase-server integration", () => {
     const res = await request(srv).get("/does/not/exist");
     expect(res.statusCode).toBe(404);
   });
+
+  test("handles HEAD requests", async () => {
+    const res = await request(srv).head("/IMG/logo.png");
+    expect(res.statusCode).toBe(200);
+    expect(res.headers["content-type"]).toMatch(/image\/png/);
+    expect(res.headers["content-length"]).toBeDefined();
+    expect(res.body).toEqual({});
+  });
+
+  test("rejects unsupported HTTP methods", async () => {
+    const res = await request(srv).post("/IMG/logo.png");
+    expect(res.statusCode).toBe(405);
+    expect(res.headers["allow"]).toBe("GET, HEAD");
+  });
+
+  test("rejects PUT method", async () => {
+    const res = await request(srv).put("/IMG/logo.png");
+    expect(res.statusCode).toBe(405);
+    expect(res.headers["allow"]).toBe("GET, HEAD");
+  });
 });

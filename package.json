@@ -1,6 +1,6 @@
 {
   "name": "nocase-server",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Lightweight static HTTP server for development that resolves file paths case-insensitively (ideal for Windows-centric projects on Linux/macOS).",
   "type": "module",
   "main": "src/server.js",
