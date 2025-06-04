@@ -42,16 +42,32 @@ export async function checkSymlinkSafety(base, filePath) {
 function parseRange(rangeHeader, fileSize) {
   if (!rangeHeader || !rangeHeader.startsWith("bytes=")) return null;
 
-  const range = rangeHeader.substring(6);
+  const range = rangeHeader.substring(6).trim();
+  if (!range) return null;
+
   const [startStr, endStr] = range.split("-");
 
-  let start = parseInt(startStr, 10);
-  let end = parseInt(endStr, 10);
+  let start;
+  let end;
 
-  if (isNaN(start) && isNaN(end)) return null;
+  // Suffix byte range, e.g. "bytes=-100" → last 100 bytes
+  if (startStr === "") {
+    const suffixLength = parseInt(endStr, 10);
+    if (isNaN(suffixLength)) return null;
+    start = fileSize - suffixLength;
+    if (start < 0) start = 0;
+    end = fileSize - 1;
+  } else {
+    start = parseInt(startStr, 10);
+    if (isNaN(start)) return null;
 
-  if (isNaN(start)) start = fileSize - end;
-  if (isNaN(end)) end = fileSize - 1;
+    if (!endStr) {
+      end = fileSize - 1;
+    } else {
+      end = parseInt(endStr, 10);
+      if (isNaN(end)) return null;
+    }
+  }
 
   if (start < 0 || end >= fileSize || start > end) return null;
 

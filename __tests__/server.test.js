@@ -84,6 +84,25 @@ describe("nocase-server integration", () => {
     expect(rangeRes.body.length).toBe(100);
   });
 
+  test("supports suffix byte range requests", async () => {
+    const fullRes = await request(srv).get("/IMG/logo.png");
+    const fileSize = fullRes.body.length;
+
+    const rangeRes = await request(srv)
+      .get("/IMG/logo.png")
+      .set("Range", "bytes=-100");
+
+    const start = fileSize - 100;
+    const end = fileSize - 1;
+
+    expect(rangeRes.statusCode).toBe(206);
+    expect(rangeRes.headers["content-range"]).toBe(`bytes ${start}-${end}/${fileSize}`);
+    expect(rangeRes.headers["content-length"]).toBe("100");
+    expect(rangeRes.headers["accept-ranges"]).toBe("bytes");
+    expect(rangeRes.body.length).toBe(100);
+    expect(rangeRes.body.equals(fullRes.body.slice(start))).toBe(true);
+  });
+
   test("handles invalid range requests", async () => {
     const res = await request(srv)
       .get("/IMG/logo.png")
