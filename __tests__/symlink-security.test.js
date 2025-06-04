@@ -85,4 +85,24 @@ describe("Symlink security tests", () => {
       throw err;
     }
   });
+
+  test("blocks symlink pointing to parent directory", async () => {
+    try {
+      // Symlink that points to the parent directory
+      await fs.symlink("..", join(testRoot, "parent"));
+
+      // Attempt to access a file in the parent directory via the symlink
+      const result = await resolveNocaseSafe(testRoot, ["parent", "secret.txt"]);
+      expect(result).not.toBeNull();
+
+      const safePath = await checkSymlinkSafety(testRoot, result);
+      expect(safePath).toBeNull();
+    } catch (err) {
+      if (err.code === "EPERM" || err.code === "ENOTSUP") {
+        console.log("Skipping symlink test - not supported on this system");
+        return;
+      }
+      throw err;
+    }
+  });
 });

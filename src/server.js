@@ -14,7 +14,7 @@ let MAX_CACHE_SIZE = 2000;
 /** Prüft, ob `target` sich noch innerhalb von `base` befindet. */
 function isInside(base, target) {
   const rel = relative(base, target);
-  return rel !== undefined && !rel.startsWith(".." + sep);
+  return rel !== ".." && !rel.startsWith(".." + sep);
 }
 
 /**
