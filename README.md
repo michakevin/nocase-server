@@ -16,7 +16,7 @@ filename casing.
 | 🎯 **SPA‑friendly** | If the requested file is not found, `index.html` is served, so React/Angular/Vue routers work out‑of‑the‑box. Use `--no-spa` to disable this behavior. |
 | 🔒 **Security hardened** | Prevents symlink traversal and path escape attacks. |
 | 📦 **Tiny dependency tree** | Only depends on the `mime` package (for proper `Content‑Type` headers). |
-| 🛠️ **Node ≥ 18** | Uses native ES modules – no transpiler required. |
+| 🛠️ **Node ≥ 22** | Uses native ES modules – no transpiler required. |
 | ⚡ **Performance optimized** | LRU cache for directory resolution and proper stream handling. |
 | 🎬 **HTTP Range support** | Supports byte-range requests for media streaming (ideal for Electron/NW.js apps). |
 

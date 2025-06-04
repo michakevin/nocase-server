@@ -1,7 +1,7 @@
 # 🚦 Copilot Guidelines für `nocase-server`
 
 **Repo-Kurzbeschreibung**  
-Dies ist ein extrem schlanker Node-18 ESM-Server, der statische Dateien
+Dies ist ein extrem schlanker Node-22 ESM-Server, der statische Dateien
 _case-insensitiv_ ausliefert (< 70 LOC, nur Abhängigkeit **mime@^4**).
 
 ---
