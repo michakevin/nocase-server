@@ -24,25 +24,41 @@ Default folder "."  port 8080  cache 2000
   process.exit(0);
 }
 
-const root = resolve(argv[0] || ".");
-const port = Number(
-  argv.includes("-p") ? argv[argv.indexOf("-p") + 1] : process.env.PORT || 8080
-);
+// collect options regardless of position
+let port = Number(process.env.PORT || 8080);
+let spa = true;
+let plainError = false;
+const positionals = [];
 
-// Cache size handling
-const cacheIndex = argv.indexOf("--cache");
-if (cacheIndex !== -1 && cacheIndex + 1 < argv.length) {
-  const cacheSize = Number(argv[cacheIndex + 1]);
-  if (!isNaN(cacheSize)) {
-    setCacheSize(cacheSize);
+for (let i = 0; i < argv.length; i++) {
+  const arg = argv[i];
+  if (arg === "-p") {
+    port = Number(argv[i + 1]);
+    i++;
+    continue;
+  }
+  if (arg === "--no-spa") {
+    spa = false;
+    continue;
+  }
+  if (arg === "--cache") {
+    const cacheSize = Number(argv[i + 1]);
+    if (!isNaN(cacheSize)) {
+      setCacheSize(cacheSize);
+    }
+    i++;
+    continue;
+  }
+  if (arg === "--plain-404") {
+    plainError = true;
+    continue;
+  }
+  if (arg !== "-v" && arg !== "--version" && arg !== "-h" && arg !== "--help") {
+    positionals.push(arg);
   }
 }
 
-// SPA flag handling
-const spa = !argv.includes("--no-spa");
-
-// 404 handling flag
-const plainError = argv.includes("--plain-404");
+const root = resolve(positionals[0] || ".");
 
 /* ─── start server ─── */
 const srv = http.createServer(createHandler(root, { spa, plainError }));
