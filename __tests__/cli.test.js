@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process";
-import { join, dirname } from "node:path";
+import { join, dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const __dir = dirname(fileURLToPath(import.meta.url));
@@ -128,5 +128,33 @@ describe("CLI tests", () => {
     expect(output.code).toBe(0);
     expect(output.stdout).toContain("Usage:");
     expect(output.stdout).toContain("cache 2000");
+  });
+
+  test("root argument can appear before or after options", async () => {
+    const root = join(__dir, "fixtures");
+
+    const run = (args) => {
+      const child = spawn("node", [cliPath, ...args], {
+        stdio: ["ignore", "pipe", "pipe"],
+      });
+
+      return new Promise((resolve) => {
+        let out = "";
+        child.stdout.on("data", (d) => {
+          out += d.toString();
+          if (out.includes("nocase-server")) {
+            child.kill();
+          }
+        });
+        child.on("close", () => resolve(out));
+      });
+    };
+
+    const first = await run(["-p", "0", root]);
+    expect(first).toContain(`(root: ${resolve(root)})`);
+    expect(first).toContain("localhost:0");
+
+    const second = await run([root, "-p", "0"]);
+    expect(second).toContain(`(root: ${resolve(root)})`);
   });
 });
