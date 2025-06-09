@@ -103,6 +103,37 @@ describe("nocase-server integration", () => {
     expect(rangeRes.body.equals(fullRes.body.slice(start))).toBe(true);
   });
 
+  test("supports open-ended range from start", async () => {
+    const fullRes = await request(srv).get("/IMG/logo.png");
+    const fileSize = fullRes.body.length;
+
+    const rangeRes = await request(srv)
+      .get("/IMG/logo.png")
+      .set("Range", "bytes=0-");
+
+    const end = fileSize - 1;
+
+    expect(rangeRes.statusCode).toBe(206);
+    expect(rangeRes.headers["content-range"]).toBe(`bytes 0-${end}/${fileSize}`);
+    expect(rangeRes.body.length).toBe(fileSize);
+  });
+
+  test("supports last-byte range requests", async () => {
+    const fullRes = await request(srv).get("/IMG/logo.png");
+    const fileSize = fullRes.body.length;
+
+    const rangeRes = await request(srv)
+      .get("/IMG/logo.png")
+      .set("Range", "bytes=-50");
+
+    const start = fileSize - 50;
+    const end = fileSize - 1;
+
+    expect(rangeRes.statusCode).toBe(206);
+    expect(rangeRes.headers["content-range"]).toBe(`bytes ${start}-${end}/${fileSize}`);
+    expect(rangeRes.body.length).toBe(50);
+  });
+
   test("handles invalid range requests", async () => {
     const res = await request(srv)
       .get("/IMG/logo.png")
