@@ -96,4 +96,35 @@ describe("Cache functionality tests", () => {
 
     expect(thirdCallCount).toBeGreaterThan(secondCallCount);
   });
+
+  test("cache eviction respects recent accesses", async () => {
+    // Limit cache to three entries
+    setCacheSize(3);
+
+    // Extra file to trigger eviction
+    await fs.writeFile(join(testRoot, "extra.txt"), "extra");
+
+    // Populate cache with two paths
+    await resolveNocaseSafe(testRoot, ["test.txt"]);
+    await resolveNocaseSafe(testRoot, ["subdir", "nested.txt"]);
+
+    // Access first path again to mark it as recently used
+    await resolveNocaseSafe(testRoot, ["test.txt"]);
+    const callsBeforeEvict = opendirCallCount;
+
+    // Resolve new file which should evict the least recently used entry
+    await resolveNocaseSafe(testRoot, ["extra.txt"]);
+    const callsAfterExtra = opendirCallCount;
+
+    expect(callsAfterExtra).toBe(callsBeforeEvict + 1);
+
+    // The first path should still be cached
+    await resolveNocaseSafe(testRoot, ["test.txt"]);
+    const callsAfterReuse = opendirCallCount;
+    expect(callsAfterReuse).toBe(callsAfterExtra);
+
+    // The nested path should require disk access again
+    await resolveNocaseSafe(testRoot, ["subdir", "nested.txt"]);
+    expect(opendirCallCount).toBeGreaterThan(callsAfterReuse);
+  });
 });

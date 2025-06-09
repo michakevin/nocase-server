@@ -106,7 +106,10 @@ export async function resolveNocaseSafe(root, segs) {
     const key = `${cur}|${seg.toLowerCase()}`;
 
     if (MAX_CACHE_SIZE > 0 && cache.has(key)) {
-      cur = cache.get(key);
+      const val = cache.get(key);
+      cache.delete(key);
+      cache.set(key, val);
+      cur = val;
       continue;
     }
 
