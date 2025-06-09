@@ -1,0 +1,43 @@
+{
+  "name": "nocase-server",
+  "version": "1.2.0",
+  "description": "Lightweight static HTTP server for development that resolves file paths case-insensitively (ideal for Windows-centric projects on Linux/macOS).",
+  "type": "module",
+  "main": "index.js",
+  "bin": {
+    "nocase-server": "./src/cli.js"
+  },
+  "scripts": {
+    "start": "node src/cli.js",
+    "link": "npm link",
+    "test": "NODE_OPTIONS=--experimental-vm-modules jest"
+  },
+  "author": "Micha Starke",
+  "license": "MIT",
+  "keywords": [
+    "http",
+    "static",
+    "server",
+    "case-insensitive",
+    "development",
+    "nocase"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/michakevin/nocase-server.git"
+  },
+  "bugs": {
+    "url": "https://github.com/michakevin/nocase-server/issues"
+  },
+  "homepage": "https://github.com/michakevin/nocase-server#readme",
+  "dependencies": {
+    "mime": "^4.0.0"
+  },
+  "devDependencies": {
+    "jest": "^29.7.0",
+    "supertest": "^7.1.1"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}
